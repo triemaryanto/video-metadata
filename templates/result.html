@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Metadata Video</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    td, th { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+    th { width: 200px; color: #555; font-weight: 600; }
+    .empty { color: #999; font-style: italic; }
+    details { margin-top: 24px; }
+    pre { background: #f5f5f5; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; }
+    a.back { display: inline-block; margin-top: 20px; color: #1a1a1a; }
+    .panel { border-radius: 10px; padding: 16px 18px; margin-top: 20px; }
+    .panel h2 { margin: 0 0 10px; font-size: 1.05rem; }
+    .panel ul { margin: 8px 0 0; padding-left: 20px; }
+    .panel-yes { background: #fff4e5; border: 1px solid #f0c36d; }
+    .panel-no { background: #eef7ee; border: 1px solid #b7dbb7; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; margin-left: 8px; }
+    .badge-dup { background: #f8d7da; color: #842029; }
+    .badge-sim { background: #fff3cd; color: #664d03; }
+    .match-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.06); font-size: 0.92rem; }
+    .match-row:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+  <h1>Metadata: {{ filename }}</h1>
+
+  <div class="panel {{ 'panel-yes' if origin.likely_youtube else 'panel-no' }}">
+    <h2>
+      {% if origin.likely_youtube %}Kemungkinan besar dari YouTube / pipeline Google{% else %}Kemungkinan bukan dari YouTube{% endif %}
+      <span style="font-weight: normal; font-size: 0.85rem; color: #555;">({{ origin.score }}/{{ origin.total }} indikator cocok)</span>
+    </h2>
+    {% if origin.matched %}
+    <ul>
+      {% for item in origin.matched %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p style="margin:0; color:#555;">Tidak ada indikator pipeline Google/YouTube yang ditemukan pada metadata.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel {{ 'panel-yes' if similar_matches else 'panel-no' }}">
+    <h2>Cek Kemiripan Konten (perceptual hash)</h2>
+    {% if similar_matches %}
+    {% for m in similar_matches %}
+    <div class="match-row">
+      <span>{{ m.filename }} <span style="color:#777;">({{ m.uploaded_at }})</span></span>
+      <span>
+        {{ m.similarity }}%
+        {% if m.is_duplicate %}<span class="badge badge-dup">Kemungkinan duplikat</span>{% else %}<span class="badge badge-sim">Mirip sebagian</span>{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+    <p style="margin:10px 0 0; color:#555; font-size:0.85rem;">Perbandingan berbasis {{ 8 }} frame yang diambil merata sepanjang durasi video. &ge;85% dianggap kemungkinan duplikat.</p>
+    {% else %}
+    <p style="margin:0; color:#555;">Tidak ditemukan video serupa di database lokal ({{ similar_matches|length }} kecocokan).</p>
+    {% endif %}
+  </div>
+
+  <table>
+    <tr><th>Judul (title)</th><td>{{ metadata.title or '' }}{% if not metadata.title %}<span class="empty">tidak ada</span>{% endif %}</td></tr>
+    <tr><th>Deskripsi</th><td>{{ metadata.description or '' }}{% if not metadata.description %}<span class="empty">tidak ada</span>{% endif %}</td></tr>
+    <tr><th>Waktu perekaman</th><td>{{ metadata.creation_time or '' }}{% if not metadata.creation_time %}<span class="empty">tidak ada</span>{% endif %}</td></tr>
+    <tr><th>Durasi</th><td>{{ metadata.duration or metadata.duration_raw or '-' }}</td></tr>
+    <tr><th>Ukuran file</th><td>{{ metadata.filesize }}</td></tr>
+    <tr><th>Resolusi</th><td>{% if metadata.width %}{{ metadata.width }}x{{ metadata.height }}{% else %}-{% endif %}</td></tr>
+    <tr><th>Frame rate</th><td>{{ metadata.fps or '-' }}</td></tr>
+    <tr><th>Bitrate</th><td>{{ metadata.bitrate or '-' }}</td></tr>
+    <tr><th>Codec video</th><td>{{ metadata.video_codec or '-' }}</td></tr>
+    <tr><th>Codec audio</th><td>{{ metadata.audio_codec or '-' }}</td></tr>
+    <tr><th>Channel audio</th><td>{{ metadata.audio_channels or '-' }}</td></tr>
+    <tr><th>Format container</th><td>{{ metadata.format_name or '-' }}</td></tr>
+    <tr><th>Merek kamera</th><td>{{ metadata.camera_make or '' }}{% if not metadata.camera_make %}<span class="empty">tidak ada</span>{% endif %}</td></tr>
+    <tr><th>Model kamera</th><td>{{ metadata.camera_model or '' }}{% if not metadata.camera_model %}<span class="empty">tidak ada</span>{% endif %}</td></tr>
+    <tr><th>Lokasi GPS</th><td>{{ metadata.gps or '' }}{% if not metadata.gps %}<span class="empty">tidak ada</span>{% endif %}</td></tr>
+    <tr><th>Encoder</th><td>{{ metadata.encoder or '-' }}</td></tr>
+  </table>
+
+  {% if metadata.all_tags %}
+  <details>
+    <summary>Lihat semua tag metadata mentah ({{ metadata.all_tags|length }})</summary>
+    <pre>{{ metadata.all_tags | tojson(indent=2) }}</pre>
+  </details>
+  {% endif %}
+
+  {% if unique_name %}
+  <form action="/strip/{{ unique_name }}" method="post" style="margin-top: 20px;">
+    <button type="submit" style="background:#444; color:#fff; border:none; padding:10px 18px; border-radius:6px; cursor:pointer;">
+      Unduh Versi Tanpa Metadata
+    </button>
+    <p style="color:#777; font-size:0.85rem; margin-top:6px;">
+      Menghapus SELURUH tag metadata dari file (title, description, handler_name, vendor_id, GPS, dll)
+      lalu melakukan encoding ulang video H.264 dan audio AAC. Berguna untuk membagikan video tanpa
+      jejak metadata pribadi.
+    </p>
+  </form>
+  {% endif %}
+
+  <a class="back" href="/">&larr; Unggah video lain</a>
+</body>
+</html>
